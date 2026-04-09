@@ -109,13 +109,49 @@ TARGET_BASE="$JRNL_SYNC"
 [[ "$IS_LOCAL" == true ]] && TARGET_BASE="$JRNL_LOCAL"
 
 if [[ "$IS_LOCAL" == false ]]; then
+    # 场景：目录存在但不是 Git 仓库（可能由于误删 .git 或克隆中断）
     if [ -d "$JRNL_SYNC" ] && [ ! -d "$JRNL_SYNC/.git" ]; then
-        echo "$STR_HEALING"
-        # 此处省略已实现的自愈 merge 逻辑，保持代码精简
+        echo -e "${YELLOW}$STR_HEALING${NC}"
+        
+        # 1. 临时备份现有数据，防止自愈过程发生意外
+        TMP_RECOVERY_DIR="${JRNL_SYNC}_recovery_$(date +%s)"
+        mv "$JRNL_SYNC" "$TMP_RECOVERY_DIR"
+        
+        # 2. 重新从远程克隆基础环境
+        if gh repo clone Journal "$JRNL_SYNC" >/dev/null 2>&1; then
+            # 3. 递归合并：将备份中的 .md 文件合并回新仓库
+            find "$TMP_RECOVERY_DIR" -name "*.md" -type f | while read -r backup_file; do
+                # 提取相对路径 (例如 2026/04/2026-04-09.md)
+                relative_path="${backup_file#$TMP_RECOVERY_DIR/}"
+                target_file="$JRNL_SYNC/$relative_path"
+                
+                mkdir -p "$(dirname "$target_file")"
+
+                if [ -f "$target_file" ]; then
+                    # 如果远程已有同名文件，为了安全采用追加（Append）模式
+                    echo -e "\n--- [Recovered Content $(date +'%Y-%m-%d %H:%M:%S')] ---\n" >> "$target_file"
+                    cat "$backup_file" >> "$target_file"
+                else
+                    # 如果远程没有该文件，直接恢复
+                    cp "$backup_file" "$target_file"
+                fi
+            done
+            # 合并完成后移除临时备份
+            rm -rf "$TMP_RECOVERY_DIR"
+            echo -e "${GREEN}自愈成功：本地数据已合并至新仓库。${NC}"
+        else
+            # 如果克隆失败，则回滚操作，保留原始目录
+            mv "$TMP_RECOVERY_DIR" "$JRNL_SYNC"
+            echo -e "${RED}自愈失败：无法连接到 GitHub。已保留原始本地文件。${NC}"
+            exit 1
+        fi
+
+    # 场景：目录完全不存在（首次安装或手动删除）
     elif [ ! -d "$JRNL_SYNC" ]; then
         gh repo clone Journal "$JRNL_SYNC" >/dev/null 2>&1 || mkdir -p "$JRNL_SYNC"
     fi
 else
+    # 本地隔离模式：仅确保目录存在
     mkdir -p "$JRNL_LOCAL"
 fi
 

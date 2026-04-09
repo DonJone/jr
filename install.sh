@@ -4,7 +4,7 @@
 # jr 日志工具  一键安装脚本
 # ==========================================
 
-# 配置 (请替换为你的实际 GitHub 仓库路径)
+# 配置
 REPO_URL="https://raw.githubusercontent.com/DonJone/Jr/main"
 BIN_DIR="$HOME/.local/bin"
 TARGET="$BIN_DIR/jr"
@@ -19,12 +19,47 @@ NC='\033[0m'
 echo -e "${BLUE}>>> 正在启动 jr 日志工具一键安装...${NC}"
 
 # 1. 环境预检
-for cmd in git gh curl; do
+# 检查强制依赖
+for cmd in git curl; do
     if ! command -v $cmd &> /dev/null; then
-        echo -e "${RED}错误: 未检测到 $cmd，请先安装它。${NC}"
+        echo -e "${RED}错误: 未检测到 $cmd，请先安装它以继续。${NC}"
         exit 1
     fi
 done
+
+# 交互式检查 GitHub CLI (gh)
+if ! command -v gh &> /dev/null; then
+    echo -e "${YELLOW}提示: 未检测到 GitHub CLI (gh)。${NC}"
+    echo -e "注意：jr 的云端同步与自愈功能依赖 gh 访问 GitHub。"
+    
+    # 引导用户选择
+    read -p "是否现在安装 gh? (y/n/s 跳过): " ACTION
+    case "$ACTION" in
+        y|Y)
+            echo -e "${BLUE}>>> 正在尝试引导安装...${NC}"
+            if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+                echo -e "请运行: ${CYAN}sudo apt install gh${NC} 或参考 https://cli.github.com/"
+            elif [[ "$OSTYPE" == "darwin"* ]]; then
+                echo -e "请运行: ${CYAN}brew install gh${NC}"
+            fi
+            echo -e "${YELLOW}请在安装并执行 'gh auth login' 后重新运行此脚本。${NC}"
+            exit 0
+            ;;
+        n|N|s|S)
+            echo -e "${YELLOW}警告: 跳过 gh 安装。jr 将仅能运行在本地模式 (-l)，云端同步将失效。${NC}"
+            sleep 2
+            ;;
+        *)
+            echo -e "无效输入，默认跳过。"
+            ;;
+    esac
+else
+    # 已安装 gh，进一步检查登录状态
+    if ! gh auth status &> /dev/null; then
+        echo -e "${YELLOW}提示: gh 已安装但未登录。${NC}"
+        echo -e "建议执行 ${CYAN}gh auth login${NC} 以确保 jr 同步功能正常。"
+    fi
+fi
 
 # 2. 准备目录
 mkdir -p "$BIN_DIR"
