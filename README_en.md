@@ -7,21 +7,18 @@
 
 `jr` is a minimalist terminal journal solution designed for developers who pursue "certainty" and "efficiency". Distinct from bloated and comprehensive note-taking applications, the core design philosophy of `jr` lies in providing robust underlying logic. Through engineering approaches, it thoroughly resolves the core pain points encountered during multi-device journal synchronization, such as Git conflicts, environment corruption, and privacy data leaks.
 
+
+
 ## One-Click Installation
-### Prerequisites
+```
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/DonJone/jr/main/install.sh)"
+```
+
+#### Prerequisites
 
 The **cloud synchronization feature** of this tool heavily depends on the **[GitHub CLI (`gh`)](https://cli.github.com/)** to handle the silent pull and push logic for the remote repository. [Install gh](ghinstall.md)
 The installation script is idempotent. It automatically detects Bash/Zsh, safely injects PATH configurations, and prevents duplicate writes.
-```bash
-/bin/bash -c "$(curl -fsSL [https://raw.githubusercontent.com/DonJone/jr/main/install.sh](https://raw.githubusercontent.com/DonJone/jr/main/install.sh))"
-```
 
-
-## One-Click Installation
-The installation script is idempotent. It automatically detects Bash/Zsh, safely injects PATH configurations, and prevents duplicate writes.
-```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/DonJone/jr/main/install.sh)"
-```
 ## System Architecture & Dependencies
 
 **Dependencies:**

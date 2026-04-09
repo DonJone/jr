@@ -9,17 +9,19 @@
 jr 是一款为追求“确定性”与“效率”的开发者打造的极简终端日志方案。有别于大而全的笔记应用，jr 的核心设计哲学在于提供稳健的底层逻辑，通过工程化手段彻底解决多设备日志同步时的 Git 冲突、环境损坏以及隐私数据泄露等核心痛点。
 
 
-## 一键安装
+## 一键安装脚本
 
-###  前置依赖 (Prerequisites)
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/DonJone/jr/main/install.sh)"
+```
+
+####  前置依赖 (Prerequisites)
 
 本工具的**云端同步功能**深度依赖于 **[GitHub CLI (`gh`)](https://cli.github.com/)** 来处理远端仓库的静默拉取与推送逻辑。[安装gh](ghinstall.md)
 
 在开始使用云同步模式之前，请确保你的系统已安装 `gh`，并且已经完成了账户授权。
-安装脚本具备幂等性，自动识别 Bash/Zsh 并安全注入 PATH 配置，防重复写入。
-```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/DonJone/jr/main/install.sh)"
-```
+
 
 ## 核心特性
 
