@@ -4,6 +4,13 @@
 # Journal CLI (jr) 
 # ==========================================
 
+# 颜色控制 (补充定义)
+BLUE='\033[0;34m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m'
+
 # 1. 路径定义
 JRNL_SYNC="$HOME/Documents/Journal"
 JRNL_LOCAL="$HOME/Documents/Journal_local"
@@ -11,7 +18,7 @@ JRNL_LOCAL="$HOME/Documents/Journal_local"
 # 2. 并发锁：防止多个实例同时操作引发 Git 冲突
 LOCKFILE="/tmp/jr_sync.lock"
 exec 200>$LOCKFILE
-flock -n 200 || { echo "Error: Another instance of jr is running."; exit 1; }
+flock -n 200 || { echo -e "${RED}Error: Another instance of jr is running.${NC}"; exit 1; }
 
 # 3. 语言识别 (Language Detection)
 [[ "$LANG" =~ ^en ]] && LANG_EN=true || LANG_EN=false
@@ -87,7 +94,7 @@ SELECTED_ACTION=""
 for arg in "$@"; do
     [[ "$arg" == "-l" || "$arg" == "--local" ]] && IS_LOCAL=true
     if [[ "$arg" =~ ^-{2,} && "$arg" != "--local" && "$arg" != "--help" && "$arg" != "--code" && "$arg" != "--gnome" && "$arg" != "--kde" && "$arg" != "--macos" ]]; then
-        echo "$STR_ERR_ARG '$arg'." >&2; exit 1
+        echo -e "${RED}$STR_ERR_ARG '$arg'.${NC}" >&2; exit 1
     fi
 done
 
@@ -97,50 +104,66 @@ while [[ $# -gt 0 ]]; do
         -l|--local) shift ;; 
         -c|--code|-g|--gnome|-k|--kde|-m|--macos)
             ((ACTION_COUNT++)); SELECTED_ACTION="$1"; shift ;;
-        -*) echo "$STR_ERR_ARG '$1'." >&2; exit 1 ;;
+        -*) echo -e "${RED}$STR_ERR_ARG '$1'.${NC}" >&2; exit 1 ;;
         *) TEXT_CONTENT="$*"; break ;;
     esac
 done
 
-[[ "$ACTION_COUNT" -gt 1 ]] && { echo "$STR_ERR_LOCK" >&2; exit 1; }
+[[ "$ACTION_COUNT" -gt 1 ]] && { echo -e "${RED}$STR_ERR_LOCK${NC}" >&2; exit 1; }
 
-# 7. 路径与自愈环境
+# 7. 路径、鉴权与自愈环境
 TARGET_BASE="$JRNL_SYNC"
 [[ "$IS_LOCAL" == true ]] && TARGET_BASE="$JRNL_LOCAL"
 
+if [[ "$IS_LOCAL" == false ]]; then
+    # 动态登录检查与交互引导
+    if ! gh auth status >/dev/null 2>&1; then
+        echo -e "${YELLOW}提示: 检测到未登录 GitHub，云端同步需要授权。${NC}"
+        read -p "是否立即配置 GitHub 登录？(y/n): " LOGIN_CHOICE
+        if [[ "$LOGIN_CHOICE" =~ ^[Yy]$ ]]; then
+            gh auth login
+            if ! gh auth status >/dev/null 2>&1; then
+                echo -e "${RED}授权未成功，为防止数据丢失，本次操作将降级为仅本地保存。${NC}"
+                IS_LOCAL=true
+                TARGET_BASE="$JRNL_LOCAL"
+            fi
+        else
+            echo -e "${YELLOW}已跳过授权，本次操作将降级为仅本地保存 (-l)。${NC}"
+            IS_LOCAL=true
+            TARGET_BASE="$JRNL_LOCAL"
+        fi
+    fi
+fi
+
+# 如果经过登录检查后，状态依然是云端模式，则执行远端交互
 if [[ "$IS_LOCAL" == false ]]; then
     # 场景：目录存在但不是 Git 仓库（可能由于误删 .git 或克隆中断）
     if [ -d "$JRNL_SYNC" ] && [ ! -d "$JRNL_SYNC/.git" ]; then
         echo -e "${YELLOW}$STR_HEALING${NC}"
         
-        # 1. 临时备份现有数据，防止自愈过程发生意外
+        # 临时备份现有数据，防止自愈过程发生意外
         TMP_RECOVERY_DIR="${JRNL_SYNC}_recovery_$(date +%s)"
         mv "$JRNL_SYNC" "$TMP_RECOVERY_DIR"
         
-        # 2. 重新从远程克隆基础环境
+        # 重新从远程克隆基础环境
         if gh repo clone Journal "$JRNL_SYNC" >/dev/null 2>&1; then
-            # 3. 递归合并：将备份中的 .md 文件合并回新仓库
+            # 递归合并：将备份中的 .md 文件合并回新仓库
             find "$TMP_RECOVERY_DIR" -name "*.md" -type f | while read -r backup_file; do
-                # 提取相对路径 (例如 2026/04/2026-04-09.md)
                 relative_path="${backup_file#$TMP_RECOVERY_DIR/}"
                 target_file="$JRNL_SYNC/$relative_path"
                 
                 mkdir -p "$(dirname "$target_file")"
 
                 if [ -f "$target_file" ]; then
-                    # 如果远程已有同名文件，为了安全采用追加（Append）模式
                     echo -e "\n--- [Recovered Content $(date +'%Y-%m-%d %H:%M:%S')] ---\n" >> "$target_file"
                     cat "$backup_file" >> "$target_file"
                 else
-                    # 如果远程没有该文件，直接恢复
                     cp "$backup_file" "$target_file"
                 fi
             done
-            # 合并完成后移除临时备份
             rm -rf "$TMP_RECOVERY_DIR"
             echo -e "${GREEN}自愈成功：本地数据已合并至新仓库。${NC}"
         else
-            # 如果克隆失败，则回滚操作，保留原始目录
             mv "$TMP_RECOVERY_DIR" "$JRNL_SYNC"
             echo -e "${RED}自愈失败：无法连接到 GitHub。已保留原始本地文件。${NC}"
             exit 1
@@ -148,11 +171,13 @@ if [[ "$IS_LOCAL" == false ]]; then
 
     # 场景：目录完全不存在（首次安装或手动删除）
     elif [ ! -d "$JRNL_SYNC" ]; then
+        echo -e "${BLUE}>>> 正在同步云端环境...${NC}"
         # 检查远程是否存在 Journal 仓库
         if gh repo view Journal >/dev/null 2>&1; then
             gh repo clone Journal "$JRNL_SYNC" >/dev/null 2>&1
         else
             # 远程不存在，自动初始化并创建私有仓库
+            echo -e "${YELLOW}未检测到远端仓库，正在自动创建并初始化私有仓库...${NC}"
             mkdir -p "$JRNL_SYNC"
             (
                 cd "$JRNL_SYNC" || exit 1
@@ -161,8 +186,10 @@ if [[ "$IS_LOCAL" == false ]]; then
             ) >/dev/null 2>&1
         fi
     fi
-else
-    # 本地隔离模式：仅确保目录存在
+fi
+
+# 本地隔离模式：确保目录存在
+if [[ "$IS_LOCAL" == true ]]; then
     mkdir -p "$JRNL_LOCAL"
 fi
 
@@ -193,7 +220,7 @@ if [ -n "$SELECTED_ACTION" ]; then
     esac
 elif [ -n "$TEXT_CONTENT" ]; then
     echo -e "## $CURRENT_TIME\n$TEXT_CONTENT\n" >> "$FILE_NAME"
-    echo "$STR_SUCCESS $([[ "$IS_LOCAL" == true ]] && echo "$STR_ZONE_LOCAL" || echo "$STR_ZONE_SYNC")。"
+    echo -e "${GREEN}$STR_SUCCESS $([[ "$IS_LOCAL" == true ]] && echo "$STR_ZONE_LOCAL" || echo "$STR_ZONE_SYNC")。${NC}"
 fi
 
 # 10. Git 自动同步 (仅限主目录模式)
