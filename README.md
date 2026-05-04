@@ -1,76 +1,148 @@
+[English](README_en.md) | 中文
 
-[English Version](README_en.md)
-
-# JR (Journal CLI)
+# jr
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-![Platform: Linux | macOS](https://img.shields.io/badge/platform-Linux%20%7C%20macOS-lightgrey.svg)
+![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20BSD-lightgrey.svg)
+![Version](https://img.shields.io/badge/version-2.0.0-green.svg)
 
-jr 是一款为追求“确定性”与“效率”的开发者打造的极简终端日志方案。有别于大而全的笔记应用，jr 的核心设计哲学在于提供稳健的底层逻辑，通过工程化手段彻底解决多设备日志同步时的 Git 冲突、环境损坏以及隐私数据泄露等核心痛点。
+极简主义的终端日志工具，为那些习惯用终端思考的开发者而生。
 
+jr 不试图成为另一个笔记应用。它只做一件事：让你在终端里快速记录日志，然后安静地离开。数据是你的，格式是 Markdown，同步由 Git 处理。
 
-## 一键安装脚本
+## 设计哲学
 
+**做一件事，并做好它。**
+
+- 输入即记录，零摩擦
+- Markdown 即格式，可读可迁移
+- Git 即同步，冲突自愈
+- 隔离即安全，敏感数据永不上传
+
+## 安装
 
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/DonJone/jr/main/install.sh)"
 ```
 
-####  前置依赖 (Prerequisites)
+脚本会自动检测环境、安装依赖、配置 PATH。如果需要云同步，会引导你完成 GitHub 授权。
 
-本工具的**云端同步功能**深度依赖于 **[GitHub CLI (`gh`)](https://cli.github.com/)** 来处理远端仓库的静默拉取与推送逻辑。[安装gh](ghinstall.md)
+### 依赖
 
-在开始使用云同步模式之前，请确保你的系统已安装 `gh`，并且已经完成了账户授权。
+| 组件 | 必需 | 说明 |
+|------|------|------|
+| `git` | ✓ | 版本控制 |
+| `curl` | ✓ | 下载安装 |
+| `gh` | 可选 | GitHub CLI，用于云同步 |
 
+## 快速开始
 
-## 核心特性
+```bash
+# 记录一条日志
+jr "今天重构了认证模块"
 
-- **轻量与便捷性**
-  采用md格式记录日志文件，输入命令与文本即可记录
-- **双模存储与目录隔离**
-  支持云端同步与本地物目录两种模式。敏感信息可被强制写入隔离目录，确保不被 Git 追踪，实现物理级的数据安全。
-- **并发安全与环境自愈**
-  内置基于 `flock` 的文件锁机制，从底层杜绝多实例并发操作导致的 Git 索引锁定。具备 `.git` 目录损坏检测能力，遇到异常可自动完成数据备份、仓库重构及合并。
-- **阻塞式编辑器集成**
-  原生支持 Code OSS, Kate, GNOME Text Editor, macOS TextEdit 等主流编辑器。采用严格的阻塞式执行逻辑，确保主进程等待编辑器关闭后再触发 Git 同步生命周期，保证数据完整性。
-- **自动化运维**
-  零配置开箱即用。自动识别系统 `$LANG` 提供本地化交互，并根据时间戳（年/月）自动构建分层级目录结构。
+# 用编辑器打开今天的日志
+jr -c
 
-## 系统架构与依赖
+# 仅记录到本地备份（不触发云端同步）
+jr -l "本地调试笔记"
 
-**依赖组件：**
-- 基础组件：`git`, `curl`
-- 增强组件：`gh` (GitHub CLI - 用于驱动自动同步与环境自愈模块)
+# 记录到隔离区（永远不会上传）
+jr -p "服务器密码: xxx"
 
-**目录拓扑结构：**
-```text
+# 从管道读取
+echo "自动化脚本输出" | jr
+
+# 查看当前状态
+jr --status
+```
+
+## 目录结构
+
+```
 ~/Documents/
-├── Journal/                 # 同步区 (由 Git/GitHub 接管)
-│   └── 2026/04/             # 年/月自动分层
-│       └── 2026-04-09.md    # 云端日志文件
-└── Journal_local/           # 本地备份与非上传日志
-    └── 2026/04/
-        └── 2026-04-09_local.md
+├── Journal/              # 同步区 → GitHub
+│   └── 2026/05/
+│       └── 2026-05-04.md
+├── Journal_local/        # 本地备份（有网时也会同步）
+│   └── 2026/05/
+│       └── 2026-05-04_local.md
+└── Journal_private/      # 隔离区（永不上传）
+    └── 2026/05/
+        └── 2026-05-04_private.md
 ```
 
-## 快速入门
+## 用法
 
-- jr 将创建本地目录与GitHub私人仓库
-- jr --help  查阅 CLI 帮助手册
-- jr text 快速记录
-- jr -c 使用code 编辑日志
-- jr -l 仅在本地目录记录
-- jr -l -c 使用code 编辑日志,仅在本地目录记录
-
-
-## 一键卸载
 ```
+jr [选项] [内容]
+
+记录模式:
+  "内容"                  记录到同步区 + 本地备份
+  -l, --local "内容"      仅记录到本地备份
+  -p, --private "内容"    记录到隔离区（永不上传）
+
+编辑器:
+  -c, --code              VS Code
+  -g, --gnome             GNOME Text Editor
+  -k, --kde               Kate
+  -m, --macos             macOS TextEdit
+  -e, --edit              $EDITOR 或系统默认
+  -x, --xdg               xdg-open (Linux)
+
+管理:
+  --login                 GitHub 登录
+  --status                查看状态
+  -q, --quiet             静默模式
+  -v, --verbose           调试模式
+  -V, --version           版本信息
+  -h, --help              帮助
+```
+
+## 配置
+
+配置文件：`~/.config/jr/config`
+
+```bash
+# 自定义目录路径
+sync_dir="$HOME/Documents/Journal"
+local_dir="$HOME/Documents/Journal_local"
+private_dir="$HOME/Documents/Journal_private"
+```
+
+## 平台支持
+
+| 平台 | 状态 |
+|------|------|
+| Linux (Ubuntu/Debian/Fedora/Arch) | ✓ |
+| macOS | ✓ |
+| FreeBSD | ✓ |
+| OpenBSD | ✓ |
+| NetBSD | ✓ |
+| DragonFlyBSD | ✓ |
+
+## 设计决策
+
+**为什么用 Markdown？**
+纯文本，可 grep，可 Git diff，任何编辑器都能打开。十年后你的日志依然可读。
+
+**为什么用 Git 同步？**
+冲突解决是已解决的问题。不发明轮子，用 Git 的 rebase 策略处理多设备同步。
+
+**为什么有隔离区？**
+密码、token、私人笔记不应该出现在 Git 历史里。物理隔离是最安全的隔离。
+
+**为什么需要 gh？**
+GitHub CLI 处理 OAuth 认证和仓库操作，比手写 token 更安全，比配置 SSH 更简单。
+
+## 卸载
+
+```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/DonJone/jr/main/uninstall.sh)"
 ```
 
+卸载不会删除你的日志数据。
 
+## 协议
 
-## 开源协议声明组件 (License)
-
-许可证
-本项目基于 [GNU Affero General Public License v3.0 (AGPL-3.0)](https://www.gnu.org/licenses/agpl-3.0) 开源。
+[AGPL-3.0](LICENSE)
